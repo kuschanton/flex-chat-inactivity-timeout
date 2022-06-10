@@ -7,10 +7,12 @@ import {
   ServerlessFunctionSignature,
 } from '@twilio-labs/serverless-runtime-types/types'
 
+// Environment variables
 type Env = {
   TIMEOUT: string
 }
 
+// Webhook event type with needed fields
 type OnReservationAccepted = {
   TaskAttributes: string,
 }
@@ -21,22 +23,26 @@ export const handler: ServerlessFunctionSignature<Env, OnReservationAccepted> = 
   callback: ServerlessCallback,
 ) {
 
-  console.log(`https://${context.DOMAIN_NAME}/on_conversation_state_updated`)
   console.log(event)
 
+  // Parse task attributes JSON string into object
   let taskAttributes = JSON.parse(event.TaskAttributes)
+
+  // Get Conversation SID for task attributes
   let conversationSid = taskAttributes["conversationSid"]
 
+  // Create a TwilioResponse object
   const response = new Twilio.Response()
   response.appendHeader('Content-Type', 'application/json')
 
+  // Create Conversation Context object
   const conversationContext = context
     .getTwilioClient()
     .conversations
-    // .services(taskAttributes["ChatServiceSid"])
     .conversations(conversationSid)
 
-  // Create webhook
+  // Create a webhook on the Conversation to be fired on onConversationStateUpdated
+  // targeting on_conversation_state_updated function
   try {
     await conversationContext
       .webhooks
@@ -44,7 +50,6 @@ export const handler: ServerlessFunctionSignature<Env, OnReservationAccepted> = 
         target: 'webhook',
         configuration: {
           url: `https://${context.DOMAIN_NAME}/on_conversation_state_updated`,
-          // url: `https://akushch.eu.ngrok.io/on_conversation_state_updated`,
           method: 'POST',
           filters: ['onConversationStateUpdated'],
         },
@@ -55,7 +60,7 @@ export const handler: ServerlessFunctionSignature<Env, OnReservationAccepted> = 
     return callback(err, response)
   }
 
-  // Set inactivity timeout
+  // Create an inactivity timeout on the Conversation using timeout from environment variable
   try {
     await conversationContext
       .update({
@@ -69,6 +74,7 @@ export const handler: ServerlessFunctionSignature<Env, OnReservationAccepted> = 
     return callback(err, response)
   }
 
+  // Return success response
   console.log('OK')
   response.setStatusCode(200)
   response.setBody({
